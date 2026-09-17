@@ -4,9 +4,7 @@ import type { AnalyticsRow, AnalyticsIndicatorKey } from '@/lib/parquet'
 import { indicators } from '@/config/general'
 import type { IndicatorMeta } from '@/config/general'
 
-const indicatorsBySlug = Object.fromEntries(
-  indicators.map((i) => [i.slug, i]),
-) as Record<AnalyticsIndicatorKey, IndicatorMeta>
+const indicatorsBySlug = Object.fromEntries(indicators.map((i) => [i.slug, i])) as Record<AnalyticsIndicatorKey, IndicatorMeta>
 
 interface AnalyticsDualChartProps {
   priority: IndicatorMeta
@@ -16,48 +14,22 @@ interface AnalyticsDualChartProps {
   isFullscreen?: boolean
 }
 
-export const AnalyticsDualChart = ({
-  data,
-  selectedIndicator = indicators[0]?.slug ?? '',
-  selectedYear,
-  isFullscreen = false,
-  priority,
-}: AnalyticsDualChartProps) => {
-  const chartHeight = isFullscreen
-    ? Math.max(180, Math.floor((window.innerHeight - 260) / 2))
-    : 320
-
-  if (!data || data.length === 0) {
-    return <p className="text-gray-500 italic py-8 text-center">No hay datos disponibles.</p>
-  }
+export const AnalyticsDualChart = ({ data, selectedIndicator = indicators[0]?.slug ?? '', selectedYear, isFullscreen = false, priority }: AnalyticsDualChartProps) => {
+  const chartHeight = isFullscreen ? Math.max(180, Math.floor((window.innerHeight - 260) / 2)) : 320
+  if (!data || data.length === 0) return <p className="text-gray-500 italic py-8 text-center">No hay datos disponibles.</p>
 
   const indicatorMeta = indicatorsBySlug[selectedIndicator]
-
-  // Sólo años con observaciones simultáneas del problema prioritario y DSS.
-  // Los faltantes permanecen ausentes: nunca se sustituyen por cero.
   const pairedData = data.filter((row) => {
     const priorityValue = Number(row.valor)
     const dssValue = Number(row[selectedIndicator])
     return Number.isFinite(priorityValue) && Number.isFinite(dssValue)
   })
 
-  if (pairedData.length === 0) {
-    return (
-      <p className="text-gray-500 italic py-8 text-center">
-        No hay años con datos simultáneos para ambos indicadores.
-      </p>
-    )
-  }
+  if (pairedData.length === 0) return <p className="text-gray-500 italic py-8 text-center">No hay años con datos simultáneos para ambos indicadores.</p>
 
   const priorityData = pairedData.map((row) => ({ anio: row.anio, valor: Number(row.valor) }))
-  const indicatorData: LineChartData[] = pairedData.map((row) => ({
-    anio: row.anio,
-    [selectedIndicator]: Number(row[selectedIndicator]) * 100,
-  }))
-
+  const indicatorData: LineChartData[] = pairedData.map((row) => ({ anio: row.anio, [selectedIndicator]: Number(row[selectedIndicator]) * 100 }))
   const priorityMax = Math.max(...priorityData.map((row) => row.valor))
-  // El componente genera cuatro intervalos principales; usar un máximo múltiplo
-  // de 4 evita etiquetas decimales en el eje de la tasa.
   const priorityAxisMax = Math.max(4, Math.ceil(priorityMax / 4) * 4)
 
   return (
@@ -83,7 +55,7 @@ export const AnalyticsDualChart = ({
             lines={[{ dataKey: selectedIndicator, name: indicatorMeta.label, color: indicatorMeta.color }]}
             height={chartHeight}
             xAxisLabel="Año"
-            yAxisLabel={indicatorMeta.axisLabel}
+            yAxisLabel="Porcentaje (%)"
             yAxisDomain={[0, 100]}
             highlightX={selectedYear ?? undefined}
           />
