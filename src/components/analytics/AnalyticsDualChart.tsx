@@ -56,7 +56,9 @@ export const AnalyticsDualChart = ({
   }))
 
   const priorityMax = Math.max(...priorityData.map((row) => row.valor))
-  const priorityAxisMax = Math.max(1, Math.ceil(priorityMax))
+  // El componente genera cuatro intervalos principales; usar un máximo múltiplo
+  // de 4 evita etiquetas decimales en el eje de la tasa.
+  const priorityAxisMax = Math.max(4, Math.ceil(priorityMax / 4) * 4)
 
   return (
     <div className="flex flex-col gap-4">
