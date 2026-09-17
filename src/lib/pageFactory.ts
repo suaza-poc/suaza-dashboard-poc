@@ -6,6 +6,8 @@ import type {
   ScatterRow, StratifiedRow,
 } from './parquet'
 
+const MIN_DISPLAY_YEAR = 2012
+
 export interface PageDatasets {
   forestPlotData: ForestPlotDataRow[]
   analyticsData: AnalyticsRow[]
@@ -20,10 +22,9 @@ async function tryLoad<T extends DataRow>(name: string, file: string | undefined
   catch (e) { console.error(`[loadAllDatasets] ${name}:`, e); return [] }
 }
 
-function omitMissingYears<T extends { anio: number }>(rows: T[], years?: number[]) {
-  if (!years?.length) return rows
-  const excluded = new Set(years)
-  return rows.filter((row) => !excluded.has(row.anio))
+function filterDisplayYears<T extends { anio: number }>(rows: T[], excludedYears?: number[]) {
+  const excluded = new Set(excludedYears ?? [])
+  return rows.filter((row) => row.anio >= MIN_DISPLAY_YEAR && !excluded.has(row.anio))
 }
 
 export async function loadAllDatasets(): Promise<PageDatasets> {
@@ -33,20 +34,26 @@ export async function loadAllDatasets(): Promise<PageDatasets> {
     // En el dataset actual de Suaza, 2026 está codificado como 0 aunque no hay
     // una observación informada. Se omite en vez de interpretarlo como tasa cero.
     const missingYears = p.excludeYears ?? (p.slug === 'mortalidad-suicidio' ? [2026] : undefined)
-    priorityData[p.slug] = omitMissingYears(rows, missingYears)
+    priorityData[p.slug] = filterDisplayYears(rows, missingYears)
   }
 
   const stratifiedData: Record<string, StratifiedRow[]> = {}
   for (const ind of indicators) {
     const rows = await tryLoad<StratifiedRow>(ind.slug, ind.file, ind.scheme, { territory: app.local })
-    stratifiedData[ind.slug] = omitMissingYears(rows, ind.excludeYears)
+    stratifiedData[ind.slug] = filterDisplayYears(rows, ind.excludeYears)
   }
 
   const { analytics, scatter, forestPlot } = app.datasets ?? {}
+  const forestPlotRows = await tryLoad<ForestPlotDataRow>('forestPlot', forestPlot?.file, forestPlot?.scheme)
+  const analyticsRows = await tryLoad<AnalyticsRow>('analytics', analytics?.file, analytics?.scheme)
+  const scatterRows = app.features.scatter
+    ? await tryLoad<ScatterRow>('scatter', scatter?.file, scatter?.scheme)
+    : []
+
   return {
-    forestPlotData: await tryLoad<ForestPlotDataRow>('forestPlot', forestPlot?.file, forestPlot?.scheme),
-    analyticsData: await tryLoad<AnalyticsRow>('analytics', analytics?.file, analytics?.scheme),
-    scatterData: app.features.scatter ? await tryLoad<ScatterRow>('scatter', scatter?.file, scatter?.scheme) : [],
+    forestPlotData: filterDisplayYears(forestPlotRows),
+    analyticsData: filterDisplayYears(analyticsRows, [2026]),
+    scatterData: filterDisplayYears(scatterRows),
     priorityData, stratifiedData,
   }
 }
